@@ -11,11 +11,8 @@ import org.springframework.stereotype.Service;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -50,33 +47,39 @@ public class QueryService {
     private Prospect getWhoIS(String url) throws IOException {
         Prospect prospect = new Prospect();
 
-        WhoisClient firstRequest = new WhoisClient();
-        firstRequest.connect("whois.iana.org", 43);
-        String query = firstRequest.query(url);
-
-        prospect.setActive(query.contains("ACTIVE"));
+        String query = getActiveStatus(url);
         String referAddressExtracted = referAddressExtract(query);
-
-        WhoisClient fingerRequest = new WhoisClient();
-        fingerRequest.connect(referAddressExtracted, 43);
-        String fingerQuery = fingerRequest.query(url);
-
-        String firmDescriptionData = fingerQuery.substring(fingerQuery.indexOf("delete:"), fingerQuery.indexOf("Administrative contact:") - 2);
-
+        String fingerQuery = getRemoteWhoIsConfiguration(url, referAddressExtracted);
+        String firmDescriptionData = getFirmDescription(fingerQuery);
         String firmName = firmDescriptionData.substring(firmDescriptionData.indexOf("name") + 4, firmDescriptionData.indexOf("org") - 2);
-        prospect.setCompanyName(firmName.trim());
-
         String firmID = firmDescriptionData.substring(firmDescriptionData.indexOf("id") + 3, firmDescriptionData.indexOf("country") - 2);
-        prospect.setCompanyId(firmID.trim());
-
         String alternativeEmail = firmDescriptionData.substring(firmDescriptionData.indexOf("email") + 6, firmDescriptionData.indexOf("changed") - 2);
-        prospect.setAlternativeEmail(alternativeEmail.trim());
 
+        prospect.setCompanyId(firmID.trim());
+        prospect.setAlternativeEmail(alternativeEmail.trim());
+        prospect.setCompanyName(firmName.trim());
+        prospect.setActive(query.contains("ACTIVE"));
         prospect.setProspectEmail(getEmailsByUrl(url).get(0));
         prospect.setPlatform(getPlatform(url).trim());
 
 
         return prospect;
+    }
+
+    private String getFirmDescription(String fingerQuery) {
+        return fingerQuery.substring(fingerQuery.indexOf("delete:"), fingerQuery.indexOf("Administrative contact:") - 2);
+    }
+
+    private String getRemoteWhoIsConfiguration(String url, String referAddressExtracted) throws IOException {
+        WhoisClient fingerRequest = new WhoisClient();
+        fingerRequest.connect(referAddressExtracted, 43);
+        return fingerRequest.query(url);
+    }
+
+    private String getActiveStatus(String url) throws IOException {
+        WhoisClient firstRequest = new WhoisClient();
+        firstRequest.connect("whois.iana.org", 43);
+        return firstRequest.query(url);
     }
 
     private String referAddressExtract(String query) {
@@ -129,7 +132,7 @@ public class QueryService {
             e.printStackTrace();
         }
 
-        if(emailSet.size() == 0){
+        if (emailSet.size() == 0) {
             emailSet.add("not found");
         }
         return emailSet;
