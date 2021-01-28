@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -24,7 +25,7 @@ public class QueryService {
         this.prospectRepository = prospectRepository;
     }
 
-    public List<Prospect> getReport(QueryDTO queryDTO) throws IOException {
+    public List<Prospect> getReport(QueryDTO queryDTO) throws IOException, InterruptedException {
         List<String> urls = new ArrayList<>();
         queryDTO.getUrls().forEach(url -> {
             urls.add(url.getUrl());
@@ -33,10 +34,11 @@ public class QueryService {
         return getReportDetails(urls);
     }
 
-    private List<Prospect> getReportDetails(List<String> urls) throws IOException {
+    private List<Prospect> getReportDetails(List<String> urls) throws IOException, InterruptedException {
         List<Prospect> prospects = new ArrayList<>();
 
         for (String url : urls) {
+            TimeUnit.SECONDS.sleep(15);
             prospects.add(getWhoIS(url));
         }
 
@@ -48,21 +50,32 @@ public class QueryService {
         Prospect prospect = new Prospect();
 
         String query = getActiveStatus(url);
-        String referAddressExtracted = referAddressExtract(query);
-        String fingerQuery = getRemoteWhoIsConfiguration(url, referAddressExtracted);
-        String firmDescriptionData = getFirmDescription(fingerQuery);
-        String firmName = firmDescriptionData.substring(firmDescriptionData.indexOf("name") + 4, firmDescriptionData.indexOf("org") - 2);
-        String firmID = firmDescriptionData.substring(firmDescriptionData.indexOf("id") + 3, firmDescriptionData.indexOf("country") - 2);
-        String alternativeEmail = firmDescriptionData.substring(firmDescriptionData.indexOf("email") + 6, firmDescriptionData.indexOf("changed") - 2);
+        try {
+            if (!query.contains("The queried object does not exist")) {
+                String referAddressExtracted = referAddressExtract(query);
+                String fingerQuery = getRemoteWhoIsConfiguration(url, referAddressExtracted);
+                String firmDescriptionData = getFirmDescription(fingerQuery);
+                String firmName = firmDescriptionData.substring(firmDescriptionData.indexOf("name") + 5, firmDescriptionData.indexOf("org") - 1).trim();
+                String firmID = firmDescriptionData.substring(firmDescriptionData.indexOf("id") + 3, firmDescriptionData.indexOf("country") - 1).trim();
+                String alternativeEmail = firmDescriptionData.substring(firmDescriptionData.indexOf("email") + 6, firmDescriptionData.indexOf("changed") - 1).trim();
 
-        prospect.setCompanyId(firmID.trim());
-        prospect.setAlternativeEmail(alternativeEmail.trim());
-        prospect.setCompanyName(firmName.trim());
-        prospect.setActive(query.contains("ACTIVE"));
-        prospect.setProspectEmail(getEmailsByUrl(url).get(0));
-        prospect.setPlatform(getPlatform(url).trim());
+                prospect.setCompanyId(firmID);
+                prospect.setAlternativeEmail(alternativeEmail);
+                prospect.setCompanyName(firmName);
+                prospect.setActive(query.contains("ACTIVE"));
+            } else {
+                prospect.setCompanyId("Not found");
+                prospect.setAlternativeEmail("none");
+                prospect.setCompanyName("not found");
+                prospect.setActive(false);
+            }
+            prospect.setProspectEmail(getEmailsByUrl(url).get(0));
+            prospect.setPlatform(getPlatform(url));
 
-
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+            return prospect;
+        }
         return prospect;
     }
 
@@ -86,9 +99,8 @@ public class QueryService {
         return query.substring(query.indexOf("whois"), query.indexOf("domain") - 2);
     }
 
-    private String getPlatform(String url) throws IOException {
+    private String getPlatform(String url) throws IOException, InterruptedException {
         String password = "6679d84065caa4e47bb6aa4820355b18b069854604720aa50ae8b2dc1c857d67faddf8";
-
         String[] command = {"curl", "-G", "https://whatcms.org/API/CMS",
                 "--data-urlencode", "key=" + password,
                 "--data-urlencode", "url=" + url};
@@ -117,7 +129,6 @@ public class QueryService {
     public List<String> getEmailsByUrl(String url) {
         Document doc;
         List<String> emailSet = new ArrayList<>();
-        System.out.println(url);
         try {
             doc = Jsoup.connect("https://" + url)
                     .userAgent("Mozilla")

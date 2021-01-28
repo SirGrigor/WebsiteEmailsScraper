@@ -20,7 +20,7 @@ public class QueryController {
     }
 
     @PostMapping("/query")
-    public List<Prospect> addUrlsToScrape(@RequestBody QueryDTO queryDTO) throws IOException {
+    public List<Prospect> addUrlsToScrape(@RequestBody QueryDTO queryDTO) throws IOException, InterruptedException {
        return queryService.getReport(queryDTO);
     }
 }
