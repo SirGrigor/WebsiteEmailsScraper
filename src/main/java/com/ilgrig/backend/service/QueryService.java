@@ -1,6 +1,7 @@
 package com.ilgrig.backend.service;
 
 import com.ilgrig.backend.dto.QueryDTO;
+import com.ilgrig.backend.entity.Prospect;
 import com.ilgrig.backend.repository.ProspectRepository;
 import org.apache.commons.net.whois.WhoisClient;
 import org.jsoup.Jsoup;
@@ -10,8 +11,11 @@ import org.springframework.stereotype.Service;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.HashSet;
-import java.util.Set;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -23,17 +27,63 @@ public class QueryService {
         this.prospectRepository = prospectRepository;
     }
 
-    public void getSingularQuery(QueryDTO queryDTO) throws IOException {
-        WhoisClient whois = new WhoisClient();
-        whois.connect("whois.iana.org", 43);
-        System.out.println(whois.query(queryDTO.getUrls().get(0).getUrl()));
-        whois.disconnect();
+    public List<Prospect> getReport(QueryDTO queryDTO) throws IOException {
+        List<String> urls = new ArrayList<>();
+        queryDTO.getUrls().forEach(url -> {
+            urls.add(url.getUrl());
+        });
 
-        System.out.println("emails: " + getEmailsByUrl("https://" + queryDTO.getUrls().get(0).getUrl()));
-        getPlatform("https://" + queryDTO.getUrls().get(0).getUrl());
+        return getReportDetails(urls);
     }
 
-    private void getPlatform(String url) throws IOException {
+    private List<Prospect> getReportDetails(List<String> urls) throws IOException {
+        List<Prospect> prospects = new ArrayList<>();
+
+        for (String url : urls) {
+            prospects.add(getWhoIS(url));
+        }
+
+        prospectRepository.saveAll(prospects);
+        return prospects;
+    }
+
+    private Prospect getWhoIS(String url) throws IOException {
+        Prospect prospect = new Prospect();
+
+        WhoisClient firstRequest = new WhoisClient();
+        firstRequest.connect("whois.iana.org", 43);
+        String query = firstRequest.query(url);
+
+        prospect.setActive(query.contains("ACTIVE"));
+        String referAddressExtracted = referAddressExtract(query);
+
+        WhoisClient fingerRequest = new WhoisClient();
+        fingerRequest.connect(referAddressExtracted, 43);
+        String fingerQuery = fingerRequest.query(url);
+
+        String firmDescriptionData = fingerQuery.substring(fingerQuery.indexOf("delete:"), fingerQuery.indexOf("Administrative contact:") - 2);
+
+        String firmName = firmDescriptionData.substring(firmDescriptionData.indexOf("name") + 4, firmDescriptionData.indexOf("org") - 2);
+        prospect.setCompanyName(firmName.trim());
+
+        String firmID = firmDescriptionData.substring(firmDescriptionData.indexOf("id") + 3, firmDescriptionData.indexOf("country") - 2);
+        prospect.setCompanyId(firmID.trim());
+
+        String alternativeEmail = firmDescriptionData.substring(firmDescriptionData.indexOf("email") + 6, firmDescriptionData.indexOf("changed") - 2);
+        prospect.setAlternativeEmail(alternativeEmail.trim());
+
+        prospect.setProspectEmail(getEmailsByUrl(url).get(0));
+        prospect.setPlatform(getPlatform(url).trim());
+
+
+        return prospect;
+    }
+
+    private String referAddressExtract(String query) {
+        return query.substring(query.indexOf("whois"), query.indexOf("domain") - 2);
+    }
+
+    private String getPlatform(String url) throws IOException {
         String password = "6679d84065caa4e47bb6aa4820355b18b069854604720aa50ae8b2dc1c857d67faddf8";
 
         String[] command = {"curl", "-G", "https://whatcms.org/API/CMS",
@@ -52,20 +102,21 @@ public class QueryService {
                 builder.append(System.getProperty("line.separator"));
             }
             String result = builder.toString();
-            System.out.print(result);
+            return builder.substring(result.indexOf("name") + 7, result.indexOf("confidence") - 3);
 
         } catch (IOException e) {
             System.out.print("error");
             e.printStackTrace();
+            return "not found";
         }
     }
 
-    public Set<String> getEmailsByUrl(String url) {
+    public List<String> getEmailsByUrl(String url) {
         Document doc;
-        Set<String> emailSet = new HashSet<>();
-
+        List<String> emailSet = new ArrayList<>();
+        System.out.println(url);
         try {
-            doc = Jsoup.connect(url)
+            doc = Jsoup.connect("https://" + url)
                     .userAgent("Mozilla")
                     .get();
 
@@ -78,9 +129,10 @@ public class QueryService {
             e.printStackTrace();
         }
 
+        if(emailSet.size() == 0){
+            emailSet.add("not found");
+        }
         return emailSet;
     }
-
-
 }
 

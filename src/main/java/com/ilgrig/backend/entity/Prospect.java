@@ -21,6 +21,18 @@ public class Prospect {
     @Column(name = "company_name")
     private String companyName;
 
-    @Column(name = "email")
-    private String prospectEmails;
+    @Column(name = "basic_email")
+    private String prospectEmail;
+
+    @Column(name = "alternative_email")
+    private String alternativeEmail;
+
+    @Column(name = "status")
+    private boolean isActive;
+
+    @Column(name = "platform")
+    private String platform;
+
+    @Column(name = "company_id")
+    private String companyId;
 }
