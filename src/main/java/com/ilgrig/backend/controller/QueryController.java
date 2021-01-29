@@ -1,37 +1,59 @@
 package com.ilgrig.backend.controller;
 
-import com.ilgrig.backend.dto.QueryDTO;
+import com.ilgrig.backend.dto.UrlCsvDTO;
 import com.ilgrig.backend.entity.Prospect;
 import com.ilgrig.backend.service.ProspectService;
 import com.ilgrig.backend.service.QueryService;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import com.opencsv.bean.CsvToBean;
+import com.opencsv.bean.CsvToBeanBuilder;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.supercsv.io.CsvBeanWriter;
 import org.supercsv.io.ICsvBeanWriter;
 import org.supercsv.prefs.CsvPreference;
 
 import javax.servlet.http.HttpServletResponse;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 
-@RestController
+@Controller
 public class QueryController {
-    private final ProspectService prospectService;
-    private final QueryService queryService;
 
+
+    private final ProspectService prospectService;
+
+    private final QueryService queryService;
     public QueryController(ProspectService prospectService, QueryService queryService) {
         this.prospectService = prospectService;
         this.queryService = queryService;
     }
 
-    @PostMapping("/query")
-    public List<Prospect> addUrlsToScrape(@RequestBody QueryDTO queryDTO) throws IOException, InterruptedException {
-        return queryService.getReport(queryDTO);
+    @PostMapping("/upload")
+    public void handleFileUpload(@RequestParam("file") MultipartFile file,  Model model) throws IOException, InterruptedException {
+        if (file.isEmpty()) {
+            model.addAttribute("message", "Please select a CSV file to upload.");
+            model.addAttribute("status", false);
+        } else {
+
+            // parse CSV file to create a list of `User` objects
+            Reader reader = new BufferedReader(new InputStreamReader(file.getInputStream()));
+                // create csv bean reader
+                CsvToBean csvToBean = new CsvToBeanBuilder(reader)
+                        .withType(UrlCsvDTO.class)
+                        .withIgnoreLeadingWhiteSpace(true)
+                        .build();
+
+                List<UrlCsvDTO> urls = csvToBean.parse();
+                queryService.getReport(urls);
+        }
     }
 
     @RequestMapping(value = "/report")
@@ -57,6 +79,5 @@ public class QueryController {
         }
 
         csvWriter.close();
-
     }
 }

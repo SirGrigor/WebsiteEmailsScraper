@@ -1,8 +1,9 @@
 package com.ilgrig.backend.service;
 
-import com.ilgrig.backend.dto.QueryDTO;
+import com.ilgrig.backend.dto.UrlCsvDTO;
 import com.ilgrig.backend.entity.Prospect;
 import com.ilgrig.backend.repository.ProspectRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.net.whois.WhoisClient;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -13,11 +14,11 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Service
+@Slf4j
 public class QueryService {
     private final ProspectRepository prospectRepository;
 
@@ -26,19 +27,20 @@ public class QueryService {
     }
 
 
-    public List<Prospect> getReport(QueryDTO queryDTO) throws IOException, InterruptedException {
+    public void getReport(List<UrlCsvDTO> queryDTO) throws IOException, InterruptedException {
         List<String> urls = new ArrayList<>();
-        queryDTO.getUrls().forEach(url -> {
+        queryDTO.forEach(url -> {
             urls.add(url.getUrl());
         });
-        return getReportDetails(urls);
+        getReportDetails(urls);
     }
 
     private List<Prospect> getReportDetails(List<String> urls) throws IOException, InterruptedException {
         List<Prospect> prospects = new ArrayList<>();
 
         for (String url : urls) {
-            TimeUnit.SECONDS.sleep(15);
+            log.debug("Current URL: " + url);
+            System.out.println("Current URL: " + url);
             prospects.add(getWhoIS(url));
         }
 
@@ -46,7 +48,7 @@ public class QueryService {
         return prospects;
     }
 
-    private Prospect getWhoIS(String url) throws IOException {
+    private Prospect getWhoIS(String url) throws IOException, InterruptedException {
         Prospect prospect = new Prospect();
 
         String query = getActiveStatus(url);
@@ -72,14 +74,22 @@ public class QueryService {
             prospect.setProspectEmail(getEmailsByUrl(url).get(0));
             prospect.setPlatform(getPlatform(url));
 
-        } catch (IOException | InterruptedException e) {
+        } catch (IOException e) {
             e.printStackTrace();
+
+            Prospect failedToFindProspect = new Prospect();
+            failedToFindProspect.setProspectEmail("none");
+            failedToFindProspect.setActive(false);
+            failedToFindProspect.setAlternativeEmail("none");
+            failedToFindProspect.setCompanyName("not found");
+            log.error("prospect for URL: " + url + " cannot be procceed");
             return prospect;
         }
         return prospect;
     }
 
     private String getFirmDescription(String fingerQuery) {
+        log.error(fingerQuery);
         return fingerQuery.substring(fingerQuery.indexOf("delete:"), fingerQuery.indexOf("Administrative contact:") - 2);
     }
 
@@ -96,6 +106,7 @@ public class QueryService {
     }
 
     private String referAddressExtract(String query) {
+        System.out.println(query);
         return query.substring(query.indexOf("whois"), query.indexOf("domain") - 2);
     }
 
