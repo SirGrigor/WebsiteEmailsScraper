@@ -25,12 +25,12 @@ public class QueryService {
         this.prospectRepository = prospectRepository;
     }
 
+
     public List<Prospect> getReport(QueryDTO queryDTO) throws IOException, InterruptedException {
         List<String> urls = new ArrayList<>();
         queryDTO.getUrls().forEach(url -> {
             urls.add(url.getUrl());
         });
-
         return getReportDetails(urls);
     }
 

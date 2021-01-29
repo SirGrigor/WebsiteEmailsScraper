@@ -28,7 +28,7 @@ public class Prospect {
     private String alternativeEmail;
 
     @Column(name = "status")
-    private boolean isActive;
+    private boolean active;
 
     @Column(name = "platform")
     private String platform;
