@@ -19,9 +19,4 @@ public class ProspectService {
        return prospectRepository.findAll();
     }
 
-    public Prospect getProspect(Long id){
-        return prospectRepository
-                .findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Not found prospect"));
-    }
 }

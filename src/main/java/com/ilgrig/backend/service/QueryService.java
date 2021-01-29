@@ -27,15 +27,13 @@ public class QueryService {
     }
 
 
-    public void getReport(List<UrlCsvDTO> queryDTO) throws IOException, InterruptedException {
+    public void getReport(List<UrlCsvDTO> queryDTO) throws IOException {
         List<String> urls = new ArrayList<>();
-        queryDTO.forEach(url -> {
-            urls.add(url.getUrl());
-        });
+        queryDTO.forEach(url -> urls.add(url.getUrl()));
         getReportDetails(urls);
     }
 
-    private List<Prospect> getReportDetails(List<String> urls) throws IOException, InterruptedException {
+    private void getReportDetails(List<String> urls) throws IOException {
         List<Prospect> prospects = new ArrayList<>();
 
         for (String url : urls) {
@@ -45,10 +43,9 @@ public class QueryService {
         }
 
         prospectRepository.saveAll(prospects);
-        return prospects;
     }
 
-    private Prospect getWhoIS(String url) throws IOException, InterruptedException {
+    private Prospect getWhoIS(String url) throws IOException {
         Prospect prospect = new Prospect();
 
         String query = getActiveStatus(url);
@@ -110,7 +107,7 @@ public class QueryService {
         return query.substring(query.indexOf("whois"), query.indexOf("domain") - 2);
     }
 
-    private String getPlatform(String url) throws IOException, InterruptedException {
+    private String getPlatform(String url) throws IOException {
         String password = "6679d84065caa4e47bb6aa4820355b18b069854604720aa50ae8b2dc1c857d67faddf8";
         String[] command = {"curl", "-G", "https://whatcms.org/API/CMS",
                 "--data-urlencode", "key=" + password,
@@ -122,7 +119,7 @@ public class QueryService {
             p = process.start();
             BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
             StringBuilder builder = new StringBuilder();
-            String line = null;
+            String line;
             while ((line = reader.readLine()) != null) {
                 builder.append(line);
                 builder.append(System.getProperty("line.separator"));
