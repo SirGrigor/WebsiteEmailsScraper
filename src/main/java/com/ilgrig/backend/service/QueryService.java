@@ -37,7 +37,6 @@ public class QueryService {
         List<Prospect> prospects = new ArrayList<>();
 
         for (String url : urls) {
-            log.debug("Current URL: " + url);
             System.out.println("Current URL: " + url);
             prospects.add(getWhoIS(url));
         }
@@ -47,64 +46,56 @@ public class QueryService {
 
     private Prospect getWhoIS(String url) throws IOException {
         Prospect prospect = new Prospect();
-
         String query = getActiveStatus(url);
         try {
-            if (!query.contains("The queried object does not exist")) {
-                String referAddressExtracted = referAddressExtract(query);
-                String fingerQuery = getRemoteWhoIsConfiguration(url, referAddressExtracted);
-                String firmDescriptionData = getFirmDescription(fingerQuery);
-                String firmName = firmDescriptionData.substring(firmDescriptionData.indexOf("name") + 5, firmDescriptionData.indexOf("org") - 1).trim();
-                String firmID = firmDescriptionData.substring(firmDescriptionData.indexOf("id") + 3, firmDescriptionData.indexOf("country") - 1).trim();
-                String alternativeEmail = firmDescriptionData.substring(firmDescriptionData.indexOf("email") + 6, firmDescriptionData.indexOf("changed") - 1).trim();
 
-                prospect.setCompanyId(firmID);
-                prospect.setAlternativeEmail(alternativeEmail);
-                prospect.setCompanyName(firmName);
-                prospect.setActive(query.contains("ACTIVE"));
+            WhoisClient whoisClient = new WhoisClient();
+            whoisClient.connect("whois.iana.org", 43);
+            String queryRecord = whoisClient.query(url);
+            prospect.setActive(queryRecord.contains("ACTIVE"));
+
+            if (query.contains("refer") && query.contains("domain")) {
+
+                String remoteAddress = queryRecord.substring(query.indexOf("refer") + 7, query.indexOf("domain")).trim();
+
+                WhoisClient remoteClient = new WhoisClient();
+                remoteClient.connect(remoteAddress, 43);
+                String remoteQuery = remoteClient.query(url);
+
+                if (remoteQuery.contains("Registrant")) {
+                    System.out.println(remoteQuery);
+                    String firmDescription = remoteQuery.substring(remoteQuery.indexOf("Registrant"), remoteQuery.indexOf("Administrative contact:") - 1);
+                    String firmName = firmDescription.substring(firmDescription.indexOf("name") + 5, firmDescription.indexOf("org")).trim();
+                    String firmId = firmDescription.substring(firmDescription.indexOf("id:") + 7, firmDescription.indexOf("country")).trim();
+                    String firmAlternativeEmail = firmDescription.substring(firmDescription.indexOf("email:") + 7, firmDescription.indexOf("changed")).trim();
+
+                    prospect.setCompanyName(firmName);
+                    prospect.setCompanyId(firmId);
+                    prospect.setProspectEmail(firmAlternativeEmail);
+
+                } else {
+                    return prospect;
+                }
+
             } else {
-                prospect.setCompanyId("Not found");
-                prospect.setAlternativeEmail("none");
-                prospect.setCompanyName("not found");
-                prospect.setActive(false);
+                return prospect;
             }
-            prospect.setProspectEmail(getEmailsByUrl(url).get(0));
-            prospect.setPlatform(getPlatform(url));
 
-        } catch (IOException e) {
-            e.printStackTrace();
 
-            Prospect failedToFindProspect = new Prospect();
-            failedToFindProspect.setProspectEmail("none");
-            failedToFindProspect.setActive(false);
-            failedToFindProspect.setAlternativeEmail("none");
-            failedToFindProspect.setCompanyName("not found");
-            log.error("prospect for URL: " + url + " cannot be procceed");
+        } catch (Exception e) {
+            log.error(String.valueOf(e));
             return prospect;
         }
         return prospect;
     }
 
-    private String getFirmDescription(String fingerQuery) {
-        log.error(fingerQuery);
-        return fingerQuery.substring(fingerQuery.indexOf("delete:"), fingerQuery.indexOf("Administrative contact:") - 2);
-    }
-
-    private String getRemoteWhoIsConfiguration(String url, String referAddressExtracted) throws IOException {
-        WhoisClient fingerRequest = new WhoisClient();
-        fingerRequest.connect(referAddressExtracted, 43);
-        return fingerRequest.query(url);
-    }
 
     private String getActiveStatus(String url) throws IOException {
         WhoisClient firstRequest = new WhoisClient();
         firstRequest.connect("whois.iana.org", 43);
-        return firstRequest.query(url);
-    }
+        firstRequest.setConnectTimeout(150);
 
-    private String referAddressExtract(String query) {
-        System.out.println(query);
-        return query.substring(query.indexOf("whois"), query.indexOf("domain") - 2);
+        return firstRequest.query(url);
     }
 
     private String getPlatform(String url) throws IOException {
@@ -119,7 +110,7 @@ public class QueryService {
             p = process.start();
             BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
             StringBuilder builder = new StringBuilder();
-            String line;
+            String line = null;
             while ((line = reader.readLine()) != null) {
                 builder.append(line);
                 builder.append(System.getProperty("line.separator"));

@@ -4,6 +4,7 @@ import com.ilgrig.backend.dto.UrlCsvDTO;
 import com.ilgrig.backend.entity.Prospect;
 import com.opencsv.bean.CsvToBean;
 import com.opencsv.bean.CsvToBeanBuilder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.ui.Model;
 import org.springframework.web.multipart.MultipartFile;
@@ -31,6 +32,7 @@ public class CsvService {
         this.prospectService = prospectService;
     }
 
+
     public void saveCSV(MultipartFile file, Model model) throws IOException {
         if (file.isEmpty()) {
             model.addAttribute("message", "Please select a CSV file to upload.");
@@ -47,7 +49,6 @@ public class CsvService {
             queryService.getReport(urls);
         }
     }
-
 
     public void createCsvReport(HttpServletResponse response) throws IOException {
         String currentDateTime = setTimeOfReport(response);
