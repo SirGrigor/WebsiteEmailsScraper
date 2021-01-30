@@ -14,8 +14,10 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -37,7 +39,6 @@ public class QueryService {
         List<Prospect> prospects = new ArrayList<>();
 
         for (String url : urls) {
-            System.out.println("Current URL: " + url);
             prospects.add(getWhoIS(url));
         }
 
@@ -63,16 +64,19 @@ public class QueryService {
                 String remoteQuery = remoteClient.query(url);
 
                 if (remoteQuery.contains("Registrant")) {
-                    System.out.println(remoteQuery);
                     String firmDescription = remoteQuery.substring(remoteQuery.indexOf("Registrant"), remoteQuery.indexOf("Administrative contact:") - 1);
                     String firmName = firmDescription.substring(firmDescription.indexOf("name") + 5, firmDescription.indexOf("org")).trim();
                     String firmId = firmDescription.substring(firmDescription.indexOf("id:") + 7, firmDescription.indexOf("country")).trim();
-                    String firmAlternativeEmail = firmDescription.substring(firmDescription.indexOf("email:") + 7, firmDescription.indexOf("changed")).trim();
 
+                    prospect.setWebsiteUrl(url);
                     prospect.setCompanyName(firmName);
                     prospect.setCompanyId(firmId);
-                    prospect.setProspectEmail(firmAlternativeEmail);
-
+                    prospect.setProspectEmail(getEmailsByUrl(url).stream().distinct().collect(Collectors.toList()).toString());
+                    prospect.setContactData(getTelephoneNumberByUrl(url).stream().distinct().collect(Collectors.toList()).toString());
+                    if(getPlatform(url).length() < 2){
+                        prospect.setPlatform("Not found");
+                    }
+                    prospect.setPlatform(getPlatform(url));
                 } else {
                     return prospect;
                 }
@@ -98,7 +102,8 @@ public class QueryService {
         return firstRequest.query(url);
     }
 
-    private String getPlatform(String url) throws IOException {
+    private String getPlatform(String url) throws InterruptedException {
+        TimeUnit.SECONDS.sleep(11);
         String password = "6679d84065caa4e47bb6aa4820355b18b069854604720aa50ae8b2dc1c857d67faddf8";
         String[] command = {"curl", "-G", "https://whatcms.org/API/CMS",
                 "--data-urlencode", "key=" + password,
@@ -110,7 +115,7 @@ public class QueryService {
             p = process.start();
             BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
             StringBuilder builder = new StringBuilder();
-            String line = null;
+            String line;
             while ((line = reader.readLine()) != null) {
                 builder.append(line);
                 builder.append(System.getProperty("line.separator"));
@@ -119,7 +124,6 @@ public class QueryService {
             return builder.substring(result.indexOf("name") + 7, result.indexOf("confidence") - 3);
 
         } catch (IOException e) {
-            System.out.print("error");
             e.printStackTrace();
             return "not found";
         }
@@ -127,25 +131,50 @@ public class QueryService {
 
     public List<String> getEmailsByUrl(String url) {
         Document doc;
-        List<String> emailSet = new ArrayList<>();
+        List<String> emailsList = new ArrayList<>();
         try {
             doc = Jsoup.connect("https://" + url)
                     .userAgent("Mozilla")
                     .get();
 
-            Pattern p = Pattern.compile("[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+");
+            Pattern p = Pattern.compile("\\b[\\w.%-]+@[-.\\w]+\\.[A-Za-z]{2,4}\\b");
             Matcher matcher = p.matcher(doc.body().html());
             while (matcher.find()) {
-                emailSet.add(matcher.group());
+                emailsList.add(matcher.group());
             }
         } catch (IOException e) {
             e.printStackTrace();
+            emailsList.add("not found");
+            return emailsList;
         }
 
-        if (emailSet.size() == 0) {
-            emailSet.add("not found");
+        if (emailsList.size() == 0) {
+            emailsList.add("not found");
         }
-        return emailSet;
+
+        return emailsList;
+    }
+
+    public List<String> getTelephoneNumberByUrl(String url) {
+        Document doc;
+        List<String> phoneNumber = new ArrayList<>();
+        try {
+            doc = Jsoup.connect("https://" + url)
+                    .userAgent("Mozilla")
+                    .get();
+
+            String page = doc.getElementsContainingOwnText("+372").text();
+            phoneNumber.add(page.substring(page.indexOf("+372", page.indexOf("+372") + 9)).trim());
+        } catch (IOException e) {
+            e.printStackTrace();
+            phoneNumber.add("not found");
+            return phoneNumber;
+        }
+
+        if (phoneNumber.size() == 0) {
+            phoneNumber.add("not found");
+        }
+        return phoneNumber;
     }
 }
 

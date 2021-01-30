@@ -4,7 +4,6 @@ import com.ilgrig.backend.dto.UrlCsvDTO;
 import com.ilgrig.backend.entity.Prospect;
 import com.opencsv.bean.CsvToBean;
 import com.opencsv.bean.CsvToBeanBuilder;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.ui.Model;
 import org.springframework.web.multipart.MultipartFile;
@@ -59,8 +58,8 @@ public class CsvService {
 
     private void writeCSV(HttpServletResponse response, List<Prospect> prospects) throws IOException {
         ICsvBeanWriter csvWriter = new CsvBeanWriter(response.getWriter(), CsvPreference.STANDARD_PREFERENCE);
-        String[] csvHeader = {"prospectId", "companyName", "prospectEmail", "alternativeEmail", "active", "platform", "companyId"};
-        String[] nameMapping = {"prospectId", "companyName", "prospectEmail", "alternativeEmail", "active", "platform", "companyId"};
+        String[] csvHeader = {"prospectId", "companyName", "prospectEmail", "active", "platform", "companyId", "websiteUrl", "contactData"};
+        String[] nameMapping = {"prospectId", "companyName", "prospectEmail", "active", "platform", "companyId", "websiteUrl", "contactData"};
 
         csvWriter.writeHeader(csvHeader);
 

@@ -24,8 +24,8 @@ public class Prospect {
     @Column(name = "basic_email")
     private String prospectEmail;
 
-    @Column(name = "alternative_email")
-    private String alternativeEmail;
+    @Column(name = "website")
+    private String websiteUrl;
 
     @Column(name = "status")
     private boolean active;
@@ -35,4 +35,7 @@ public class Prospect {
 
     @Column(name = "company_id")
     private String companyId;
+
+    @Column(name = "telephone")
+    private String contactData;
 }

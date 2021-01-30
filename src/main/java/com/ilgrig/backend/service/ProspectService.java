@@ -1,7 +1,6 @@
 package com.ilgrig.backend.service;
 
 import com.ilgrig.backend.entity.Prospect;
-import com.ilgrig.backend.exception.ResourceNotFoundException;
 import com.ilgrig.backend.repository.ProspectRepository;
 import org.springframework.stereotype.Service;
 
