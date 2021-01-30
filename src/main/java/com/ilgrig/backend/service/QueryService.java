@@ -37,11 +37,9 @@ public class QueryService {
 
     private void getReportDetails(List<String> urls) throws IOException {
         List<Prospect> prospects = new ArrayList<>();
-
         for (String url : urls) {
             prospects.add(getWhoIS(url));
         }
-
         prospectRepository.saveAll(prospects);
     }
 
@@ -73,10 +71,10 @@ public class QueryService {
                     prospect.setCompanyId(firmId);
                     prospect.setProspectEmail(getEmailsByUrl(url).stream().distinct().collect(Collectors.toList()).toString());
                     prospect.setContactData(getTelephoneNumberByUrl(url).stream().distinct().collect(Collectors.toList()).toString());
-                    if(getPlatform(url).length() < 2){
-                        prospect.setPlatform("Not found");
-                    }
-                    prospect.setPlatform(getPlatform(url));
+//                    if(getPlatform(url).length() < 2){
+//                        prospect.setPlatform("Not found");
+//                    }
+//                    prospect.setPlatform(getPlatform(url));
                 } else {
                     return prospect;
                 }
@@ -97,7 +95,6 @@ public class QueryService {
     private String getActiveStatus(String url) throws IOException {
         WhoisClient firstRequest = new WhoisClient();
         firstRequest.connect("whois.iana.org", 43);
-        firstRequest.setConnectTimeout(150);
 
         return firstRequest.query(url);
     }
@@ -162,9 +159,8 @@ public class QueryService {
             doc = Jsoup.connect("https://" + url)
                     .userAgent("Mozilla")
                     .get();
-
-            String page = doc.getElementsContainingOwnText("+372").text();
-            phoneNumber.add(page.substring(page.indexOf("+372", page.indexOf("+372") + 9)).trim());
+            String page = doc.getElementsContainingOwnText("+372").text().replaceAll("[^0-9]", "");
+            phoneNumber.add(page.substring(page.indexOf("372"), page.indexOf("372") + 10));
         } catch (IOException e) {
             e.printStackTrace();
             phoneNumber.add("not found");
