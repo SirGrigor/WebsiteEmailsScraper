@@ -117,7 +117,7 @@ public class QueryService {
 
     private String getPlatform(String url) throws InterruptedException {
         TimeUnit.SECONDS.sleep(11);
-        String password = "6679d84065caa4e47bb6aa4820355b18b069854604720aa50ae8b2dc1c857d67faddf8";
+        String password = "6699d8cf40aee4abbf6584e08abe12481877c9cc955c027f5b0b381a4a99f746354aba";
         String[] command = {"curl", "-G", "https://whatcms.org/API/CMS",
                 "--data-urlencode", "key=" + password,
                 "--data-urlencode", "url=" + url};
