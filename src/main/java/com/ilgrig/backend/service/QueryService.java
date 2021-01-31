@@ -4,6 +4,7 @@ import com.ilgrig.backend.dto.UrlCsvDTO;
 import com.ilgrig.backend.entity.Prospect;
 import com.ilgrig.backend.repository.ProspectRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.net.whois.WhoisClient;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -40,7 +41,17 @@ public class QueryService {
         for (String url : urls) {
             prospects.add(getWhoIS(url));
         }
-        prospectRepository.saveAll(prospects);
+        prospectRepository.saveAll(getListCleanedUp(prospects));
+    }
+
+    private List<Prospect> getListCleanedUp(List<Prospect> prospects) {
+        List<Prospect> cleanedList = new ArrayList<>();
+        prospects.forEach(prospect -> {
+            if (prospect.getCompanyId() != null) {
+                cleanedList.add(prospect);
+            }
+        });
+        return cleanedList;
     }
 
     private Prospect getWhoIS(String url) throws IOException {
@@ -69,12 +80,18 @@ public class QueryService {
                     prospect.setWebsiteUrl(url);
                     prospect.setCompanyName(firmName);
                     prospect.setCompanyId(firmId);
-                    prospect.setProspectEmail(getEmailsByUrl(url).stream().distinct().collect(Collectors.toList()).toString());
-                    prospect.setContactData(getTelephoneNumberByUrl(url).stream().distinct().collect(Collectors.toList()).toString());
-//                    if(getPlatform(url).length() < 2){
-//                        prospect.setPlatform("Not found");
-//                    }
-//                    prospect.setPlatform(getPlatform(url));
+
+                    if (getEmailsByUrl(url).stream().distinct().count() > 3) {
+                        prospect.setProspectEmail(getEmailsByUrl(url).stream().distinct().collect(Collectors.toList()).subList(0, 2).toString());
+                    } else {
+                        prospect.setProspectEmail(getEmailsByUrl(url).stream().distinct().collect(Collectors.toList()).get(0));
+                    }
+
+                    prospect.setContactData(getTelephoneNumberByUrl(url).stream().distinct().collect(Collectors.toList()).get(0));
+                    if (getPlatform(url).length() < 2) {
+                        prospect.setPlatform("Not found");
+                    }
+                    prospect.setPlatform(getPlatform(url));
                 } else {
                     return prospect;
                 }
@@ -82,7 +99,6 @@ public class QueryService {
             } else {
                 return prospect;
             }
-
 
         } catch (Exception e) {
             log.error(String.valueOf(e));
@@ -118,7 +134,16 @@ public class QueryService {
                 builder.append(System.getProperty("line.separator"));
             }
             String result = builder.toString();
-            return builder.substring(result.indexOf("name") + 7, result.indexOf("confidence") - 3);
+            String platform = builder.substring(result.indexOf("cms_url") + 9, result.indexOf("}") - 1);
+
+            if (platform.contains("whatcms")) {
+                String redundantStringPart = "\"https:\\/\\/whatcms.org\\/c\\/";
+                platform = StringUtils.remove(platform, redundantStringPart);
+
+            } else {
+                platform = "not found";
+            }
+            return platform;
 
         } catch (IOException e) {
             e.printStackTrace();
